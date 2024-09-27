@@ -112,6 +112,10 @@ for e = 1:numElectrodes
 
 end % electrode loop
 
+%% Saving data
+
+save('./Data/HumanIndentSCData.mat', )
+
 
 %% Summary plots
 
