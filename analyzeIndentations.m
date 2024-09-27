@@ -84,18 +84,18 @@ for e = 1:numElectrodes
     sustainFR = sustainSC ./ diff(sustainInt);
     offsetFR = offsetSC ./ diff(offsetInt);
 
-    baselineMu = mean(baselineFR(:));
-    baselineSigma = std(baselineFR(:));
+    baselineMu(e) = mean(baselineFR(:));
+    baselineSigma(e) = std(baselineFR(:));
 
     % Permutation Test
     baseline2FR = baseline2FR(:);
     for r = 1:numReps
         tmp = datasample(baseline2FR, numSamples, 'Replace', true);
-        nullDist(e, r) = (mean(tmp) - baselineMu) ./ baselineSigma;
+        nullDist(e, r) = (mean(tmp) - baselineMu(e)) ./ baselineSigma(e);
     end % permutation loop
 
     % Significance test?
-    stimModValue(e) = (mean(onsetFR(:)) - baselineMu) ./ baselineSigma;
+    stimModValue(e) = (mean(onsetFR(:)) - baselineMu(e)) ./ baselineSigma(e);
 
     leftTail = 1 - sum(stimModValue(e) < nullDist(e, :)) / numReps;
     rightTail = 1 - (sum(stimModValue(e) > nullDist(e, :)) / numReps);
@@ -107,7 +107,7 @@ for e = 1:numElectrodes
     %     stimModValue(e) = (median(onsetFR) - baselineMu) ./ baselineSigma;
 
     % Adaptation Index
-    adaptationIndex(e) = computeAdaptationIndex(mean(offsetFR(:)) - baselineMu, mean(sustainFR(:)) - baselineMu, 'tan');
+    adaptationIndex(e) = computeAdaptationIndex(mean(offsetFR(:)) - baselineMu(e), mean(sustainFR(:)) - baselineMu(e), 'tan');
 
 end % electrode loop
 
@@ -146,27 +146,76 @@ end % electrode loop
 sigElecIdx = find(isMod);
 numSigElecs = length(sigElecIdx);
 
-% New spike count matrix that only contains the significantly modulated
-% channels
-sigSpikeCounts = spikeCounts(:, :, sigElecIdx);
+% Find the sensory and motor channel indices
+chanMap = LoadSubjectChannelMap('BCI02');
+
+chFilter = cat(1, chanMap.ArrayLocations{chanMap.IsSensory});
+sensoryChannelInd = sort(chFilter(~isnan(chFilter)));
+
+chFilter = cat(1, chanMap.ArrayLocations{chanMap.IsMotor});
+motorChannelInd = sort(chFilter(~isnan(chFilter)));
+
+% Order the significantly modulated electrodes into sensory and motor
+% groups
+elecOrder = [sigElecIdx(ismember(sigElecIdx, sensoryChannelInd)), sigElecIdx(ismember(sigElecIdx, motorChannelInd))];
 
 % Binning params
 dt = 0.001;
-binEdges = [-.2:dt:1.2];
+binEdges = [-.2:dt:1.5];
 gaussWidth = 5; % for smoothing
+numTrials = 1500; % Need to compute from data
+
+maxCorr = NaN(numSigElecs, numSigElecs);
+maxLag = NaN(numSigElecs, numSigElecs);
 
 for n1 = 1:numSigElecs
-    tmpSpikes = vertcat(sigSpikeCounts{1:5, 1:5, n1});
+    tmpSpikes = vertcat(spikeCounts{1:5, 1:5, elecOrder(n1)});
     tmpSpikes = horzcat(tmpSpikes{:});
-    tmpPSTH = histcounts(tmpSpikes, binEdges) ./ dt;
-    refPSTH = 
+    n1PSTH = (histcounts(tmpSpikes, binEdges) ./ dt) ./ numTrials ;
+
     for n2 = (n1 + 1):numSigElecs
+        tmpSpikes = vertcat(spikeCounts{1:5, 1:5, elecOrder(n2)});
+        tmpSpikes = horzcat(tmpSpikes{:});
+        n2PSTH = (histcounts(tmpSpikes, binEdges) ./ dt) ./ numTrials ;
+        [corrVal, lags] = xcorr(n1PSTH, n2PSTH, 100, 'normalized');
+        if any(corrVal < 0)
+            input ''
 
+        end
+        [maxCorr(n1, n2), lagIdx] = max(abs(corrVal));
+        maxLag(n1, n2) = lags(lagIdx);
 
+        %
+%         subplot(3,1,1)
+%         plot(binEdges(1:end - 1) + (dt / 2), refPSTH)
+%         subplot(3,1,2)
+%         plot(binEdges(1:end - 1) + (dt / 2), n2PSTH)
+%         subplot(3,1,3)
+%         stem(lags, corrVal)
 
-    end % channel 2 loop
+    end % channel 2 loops
 
 end % channel 1 loop
+
+figure;
+nexttile
+h = imagesc(maxCorr);
+set(h, 'AlphaData', ~isnan(maxCorr))
+axis square
+cbar = colorbar;
+ylabel(cbar, 'Correlation')
+set(gca, 'YTick', [1, 5, 30, 58], 'YTickLabel', {'Ant. SC', 'Post. SC', 'Ant. MC', 'Post. MC'})
+title('Max Correlation')
+
+nexttile
+h = imagesc(maxLag);
+set(h, 'AlphaData', ~isnan(maxLag))
+axis square
+cbar = colorbar;
+ylabel(cbar, 'Lag Time')
+set(gca, 'YTick', [1, 5, 30, 58], 'YTickLabel', {'Ant. SC', 'Post. SC', 'Ant. MC', 'Post. MC'})
+title('Lag Time')
+
 
 %% Saving data
 
