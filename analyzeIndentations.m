@@ -51,10 +51,65 @@ end % freq loop
 
 %% Compute response to stimulus
 
-baselineInt = [-1 -.5];
-onsetInt = [0 0.5];
+baselineInt = [-1, -.6]; % [-1 -.5];
+baseline2Int = [-.6 -.2];
+onsetInt = [0 0.4]; % [0 0.5];
 sustainInt = [.5 .7];
 offsetInt = [1 1.2];
+
+% Permutation Params
+numReps = 1000;
+numSamples = 100;
+alpha = 0.1;
+
+nullDist = zeros(numElectrodes, numReps);
+pMod = zeros(1, numElectrodes);
+isMod = zeros(1, numElectrodes);
+stimModValue = zeros(1, numElectrodes);
+adaptationIndex = zeros(1, numElectrodes);
+
+for e = 1:numElectrodes
+    tmpSpikes = [spikeCounts{:, :, e}];
+
+    baselineSC = cellfun(@(z) sum(z(:) >= baselineInt(1) & z(:) <= baselineInt(2)), tmpSpikes);
+    baseline2SC = cellfun(@(z) sum(z(:) >= baseline2Int(1) & z(:) <= baseline2Int(2)), tmpSpikes);
+
+    onsetSC = cellfun(@(z) sum(z(:) >= onsetInt(1) & z(:) <= onsetInt(2)), tmpSpikes);
+    sustainSC = cellfun(@(z) sum(z(:) >= sustainInt(1) & z(:) <= sustainInt(2)), tmpSpikes);
+    offsetSC = cellfun(@(z) sum(z(:) >= offsetInt(1) & z(:) <= offsetInt(2)), tmpSpikes);
+
+    baselineFR = baselineSC ./ diff(baselineInt);
+    baseline2FR = baseline2SC ./ diff(baseline2Int);
+    onsetFR = onsetSC ./ diff(onsetInt);
+    sustainFR = sustainSC ./ diff(sustainInt);
+    offsetFR = offsetSC ./ diff(offsetInt);
+
+    baselineMu = mean(baselineFR(:));
+    baselineSigma = std(baselineFR(:));
+
+    % Permutation Test
+    baseline2FR = baseline2FR(:);
+    for r = 1:numReps
+        tmp = datasample(baseline2FR, numSamples, 'Replace', true);
+        nullDist(e, r) = (mean(tmp) - baselineMu) ./ baselineSigma;
+    end % permutation loop
+
+    % Significance test?
+    stimModValue(e) = (mean(onsetFR(:)) - baselineMu) ./ baselineSigma;
+
+    leftTail = 1 - sum(stimModValue(e) < nullDist(e, :)) / numReps;
+    rightTail = 1 - (sum(stimModValue(e) > nullDist(e, :)) / numReps);
+    pMod(e) = min([leftTail, rightTail]);
+    isMod(e) = pMod(e) <= alpha / 2;
+
+    %         baselineMu = median(baselineFR(:));
+    %     baselineSigma = max(abs(baselineFR(:) - baselineMu));
+    %     stimModValue(e) = (median(onsetFR) - baselineMu) ./ baselineSigma;
+
+    % Adaptation Index
+    adaptationIndex(e) = computeAdaptationIndex(mean(offsetFR(:)) - baselineMu, mean(sustainFR(:)) - baselineMu, 'tan');
+
+end % electrode loop
 
 % stimModValue = zeros(length(freq), length(amp), numElectrodes);
 % adaptationIndex = zeros(length(freq), length(amp), numElectrodes);
@@ -84,46 +139,39 @@ offsetInt = [1 1.2];
 %     end % amp loop
 % end % freq loop
 
-stimModValue = zeros(1, numElectrodes);
-adaptationIndex = zeros(1, numElectrodes);
 
-for e = 1:numElectrodes
-    tmpSpikes = [spikeCounts{:, :, e}];
+%% CCR Analysis
 
-    baselineSC = cellfun(@(z) sum(z(:) >= baselineInt(1) & z(:) <= baselineInt(2)), tmpSpikes);
-    onsetSC = cellfun(@(z) sum(z(:) >= onsetInt(1) & z(:) <= onsetInt(2)), tmpSpikes);
-    sustainSC = cellfun(@(z) sum(z(:) >= sustainInt(1) & z(:) <= sustainInt(2)), tmpSpikes);
-    offsetSC = cellfun(@(z) sum(z(:) >= offsetInt(1) & z(:) <= offsetInt(2)), tmpSpikes);
+% Get the significantly modulated channels
+sigElecIdx = find(isMod);
+numSigElecs = length(sigElecIdx);
 
-    baselineFR = baselineSC ./ diff(baselineInt);
-    onsetFR = onsetSC ./ diff(onsetInt);
-    sustainFR = sustainSC ./ diff(sustainInt);
-    offsetFR = offsetSC ./ diff(offsetInt);
+% New spike count matrix that only contains the significantly modulated
+% channels
+sigSpikeCounts = spikeCounts(:, :, sigElecIdx);
 
-    baselineMu = mean(baselineFR(:));
-    baselineSigma = std(baselineFR(:));
-    stimModValue(e) = (mean(onsetFR(:)) - baselineMu) ./ baselineSigma;
+% Binning params
+dt = 0.001;
+binEdges = [-.2:dt:1.2];
+gaussWidth = 5; % for smoothing
 
-    %         baselineMu = median(baselineFR(:));
-    %     baselineSigma = max(abs(baselineFR(:) - baselineMu));
-    %     stimModValue(e) = (median(onsetFR) - baselineMu) ./ baselineSigma;
+for n1 = 1:numSigElecs
+    tmpSpikes = vertcat(sigSpikeCounts{1:5, 1:5, n1});
+    tmpSpikes = horzcat(tmpSpikes{:});
+    tmpPSTH = histcounts(tmpSpikes, binEdges) ./ dt;
+    refPSTH = 
+    for n2 = (n1 + 1):numSigElecs
 
-    adaptationIndex(e) = computeAdaptationIndex(mean(offsetFR(:)) - baselineMu, mean(sustainFR(:)) - baselineMu, 'tan');
 
-end % electrode loop
+
+    end % channel 2 loop
+
+end % channel 1 loop
 
 %% Saving data
 
-save('./Data/HumanIndentSCData.mat', )
+% save('./Data/HumanIndentSCData.mat', )
 
-
-%% Summary plots
-
-modThresh = 1.5;
-
-sensoryElecIdx = [65:96, 193:224];
-
-histogram(adaptationIndex(sensoryElecIdx(stimModValue(sensoryElecIdx) >= modThresh )), 'BinEdges', linspace(0, 1, 7))
 
 %% Plotting
 
@@ -135,6 +183,50 @@ binEdges = -1:dt:2;
 binCenter = binEdges(1:end-1) + (dt / 2);
 
 analogTime = linspace(-1, 2, 30e3);
+
+%% Plot Average ACROSS Condition Response
+
+figure('Units', 'Inches', 'Position', [8 4 4 3])
+for e = 1:256
+    clf;
+
+    if ismember(e, chanMap.ArrayLocations{1}) || ismember(e, chanMap.ArrayLocations{3})
+        array_loc = 'Motor';
+        plt_color = rgb(0, 91, 127);
+    else
+        array_loc = 'Sensory';
+        plt_color = rgb(152, 3, 126);
+    end
+
+    axes('Position', [.15 .15 .8 .725]); hold on
+
+    t = FoldedPSTH(vertcat(spikeCounts{1:5, 1:5, e}), binEdges, 5, 5);
+    AlphaLine(binCenter, t, plt_color)
+    ylabel('Firing Rate (Hz)')
+    set(gca, 'XTick', -1:1:2)
+    xlabel('Time (s)')
+
+    title(sprintf('%s: Electrode %d', array_loc, e))
+    yLim = get(gca, 'YLim');
+
+    if exist('stimModValue', 'var')
+        if isMod(e)
+            text(-.9, yLim(2), {sprintf('MV: %.2f', stimModValue(e)); sprintf('p: %.2f', pMod(e)); sprintf('AI: %.2f', adaptationIndex(e))}, ...
+                'FontSize', 10, 'FontWeight', 'bold', 'HorizontalAlignment', 'left', 'VerticalAlignment', 'top')
+        else
+            text(-.9, yLim(2), {sprintf('MV: %.2f', stimModValue(e)); sprintf('p: %.2f', pMod(e)); sprintf('AI: %.2f', adaptationIndex(e))}, ...
+                'FontSize', 10, 'HorizontalAlignment', 'left', 'VerticalAlignment', 'top')
+        end
+    end
+
+    print(gcf, fullfile('.\Figures\Indentations', ...
+        sprintf('%s_%d', array_loc, e)), '-dpng', '-r300')
+
+end
+
+%%
+
+
 
 % Plot one condition with stimulus
 for e = 71
@@ -207,7 +299,7 @@ for e = 216 %1:numElectrodes
     ylabel('FR')
     title(sprintf('%s: Electrode %d', array_loc, e))
 
-        yLim = get(gca, 'YLim');
+    yLim = get(gca, 'YLim');
     if exist('stimModValue', 'var')
         text(-.95, yLim(2), {sprintf('MV: %.2f', stimModValue(e)); sprintf('AI: %.2f', adaptationIndex(e))}, ...
             'FontSize', 12, 'HorizontalAlignment', 'left', 'VerticalAlignment', 'top')
@@ -226,8 +318,8 @@ for e = 216 %1:numElectrodes
     set(gca, 'YLim', [0 yo])
     xlabel('Time (s)')
 
-%     print(gcf, fullfile('.\Figures\Indentations', ...
-%         sprintf('%s_%d', array_loc, e)), '-dpng', '-r300')
+    %     print(gcf, fullfile('.\Figures\Indentations', ...
+    %         sprintf('%s_%d', array_loc, e)), '-dpng', '-r300')
 
 end
 
