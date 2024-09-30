@@ -1,4 +1,4 @@
-load("U:\UserFolders\CharlesGreenspon\SpeciesVibrations\RawSpeciesVibData.mat")
+load("S:\UserFolders\CharlesGreenspon\SpeciesVibrations\RawSpeciesVibData.mat")
 addpath(genpath('HelperFunctions'))
 all_data = cat(1, HumanCorticalSineData, MacaqueCorticalSineData, MacaqueCuneateSineData, MacaqueAfferentSineData);
 clearvars -except all_data
