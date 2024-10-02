@@ -143,7 +143,8 @@ end % electrode loop
 %% CCR Analysis
 
 % Get the significantly modulated channels
-sigElecIdx = find(isMod);
+
+sigElecIdx = find(baselineMu >= 5);
 numSigElecs = length(sigElecIdx);
 
 % Find the sensory and motor channel indices
@@ -160,7 +161,7 @@ motorChannelInd = sort(chFilter(~isnan(chFilter)));
 elecOrder = [sigElecIdx(ismember(sigElecIdx, sensoryChannelInd)), sigElecIdx(ismember(sigElecIdx, motorChannelInd))];
 
 % Binning params
-dt = 0.001;
+dt = 0.01;
 binEdges = [-.2:dt:1.5];
 gaussWidth = 5; % for smoothing
 numTrials = 1500; % Need to compute from data
@@ -172,22 +173,24 @@ for n1 = 1:numSigElecs
     tmpSpikes = vertcat(spikeCounts{1:5, 1:5, elecOrder(n1)});
     tmpSpikes = horzcat(tmpSpikes{:});
     n1PSTH = (histcounts(tmpSpikes, binEdges) ./ dt) ./ numTrials ;
+    n1PSTH = (n1PSTH - baselineMu(elecOrder(n1))) ./ baselineSigma(elecOrder(n1));
 
     for n2 = (n1 + 1):numSigElecs
         tmpSpikes = vertcat(spikeCounts{1:5, 1:5, elecOrder(n2)});
         tmpSpikes = horzcat(tmpSpikes{:});
         n2PSTH = (histcounts(tmpSpikes, binEdges) ./ dt) ./ numTrials ;
-        [corrVal, lags] = xcorr(n1PSTH, n2PSTH, 100, 'normalized');
-        if any(corrVal < 0)
-            input ''
+        n2PSTH = (n2PSTH - baselineMu(elecOrder(n2))) ./ baselineSigma(elecOrder(n2));
 
-        end
-        [maxCorr(n1, n2), lagIdx] = max(abs(corrVal));
-        maxLag(n1, n2) = lags(lagIdx);
+        % Compute the CCR and get the max corr and lag which corresponds to
+        % it
+        [corrVal, lags] = xcorr(n1PSTH, n2PSTH, 10, 'normalized');
+        [~, lagIdx] = max(abs(corrVal));
+        maxCorr(n1, n2) = corrVal(lagIdx); maxCorr(n2, n1) = corrVal(lagIdx);
+        maxLag(n1, n2) = lags(lagIdx);     maxLag(n2, n1) = lags(lagIdx);
 
-        %
+        % Check individual channel results
 %         subplot(3,1,1)
-%         plot(binEdges(1:end - 1) + (dt / 2), refPSTH)
+%         plot(binEdges(1:end - 1) + (dt / 2), n1PSTH)
 %         subplot(3,1,2)
 %         plot(binEdges(1:end - 1) + (dt / 2), n2PSTH)
 %         subplot(3,1,3)
@@ -197,6 +200,7 @@ for n1 = 1:numSigElecs
 
 end % channel 1 loop
 
+%%
 figure;
 nexttile
 h = imagesc(maxCorr);
@@ -204,17 +208,91 @@ set(h, 'AlphaData', ~isnan(maxCorr))
 axis square
 cbar = colorbar;
 ylabel(cbar, 'Correlation')
-set(gca, 'YTick', [1, 5, 30, 58], 'YTickLabel', {'Ant. SC', 'Post. SC', 'Ant. MC', 'Post. MC'})
+
+hold on
+
+% Anterior sensory array line
+chFilter = cat(1, chanMap.ArrayLocations{2});
+chFilter = sort(chFilter(~isnan(chFilter)));
+antSensoryChIdx = find(ismember(elecOrder,  chFilter), 1, 'last');
+
+plot([0.5, length(elecOrder) + 0.5], [antSensoryChIdx + 0.5, antSensoryChIdx + 0.5], 'k', 'LineWidth', 1) % bottom
+plot([antSensoryChIdx + 0.5, antSensoryChIdx + 0.5], [0.5 length(elecOrder) + 0.5], 'k', 'LineWidth', 1) % right
+
+% Posterior sensory array line
+chFilter = cat(1, chanMap.ArrayLocations{4});
+chFilter = sort(chFilter(~isnan(chFilter)));
+postSensoryChIdx = find(ismember(elecOrder,  chFilter), 1, 'last');
+
+plot([0.5, length(elecOrder) + 0.5], [postSensoryChIdx + 0.5, postSensoryChIdx + 0.5], 'k', 'LineWidth', 1) % bottom
+plot([postSensoryChIdx + 0.5, postSensoryChIdx + 0.5], [0.5 length(elecOrder) + 0.5], 'k', 'LineWidth', 1) % right
+
+% Anterior motor array line
+chFilter = cat(1, chanMap.ArrayLocations{1});
+chFilter = sort(chFilter(~isnan(chFilter)));
+antMotorChIdx = find(ismember(elecOrder,  chFilter), 1, 'last');
+
+plot([0.5, length(elecOrder) + 0.5], [antMotorChIdx + 0.5, antMotorChIdx + 0.5], 'k', 'LineWidth', 1) % bottom
+plot([antMotorChIdx + 0.5, antMotorChIdx + 0.5], [0.5 length(elecOrder) + 0.5], 'k', 'LineWidth', 1) % right
+
+% Posterior motor array line
+chFilter = cat(1, chanMap.ArrayLocations{3});
+chFilter = sort(chFilter(~isnan(chFilter)));
+postMotorChIdx = find(ismember(elecOrder,  chFilter), 1, 'last');
+
+plot([0.5, length(elecOrder) + 0.5], [postMotorChIdx + 0.5, postMotorChIdx + 0.5], 'k', 'LineWidth', 1) % bottom
+plot([postMotorChIdx + 0.5, postMotorChIdx + 0.5], [0.5 length(elecOrder) + 0.5], 'k', 'LineWidth', 1) % right
+
+
+% % Anterior sensory array line
+% chFilter = cat(1, chanMap.ArrayLocations{2});
+% chFilter = sort(chFilter(~isnan(chFilter)));
+% antSensoryChIdx = find(ismember(elecOrder,  chFilter), 1, 'last');
+% 
+% plot([0.5, antSensoryChIdx + 0.5], [antSensoryChIdx + 0.5, antSensoryChIdx + 0.5], 'k', 'LineWidth', 1) % bottom
+% plot([antSensoryChIdx + 0.5, antSensoryChIdx + 0.5], [antSensoryChIdx + 0.5, 0], 'k', 'LineWidth', 1) % right
+% 
+% % Posterior sensory array line
+% chFilter = cat(1, chanMap.ArrayLocations{4});
+% chFilter = sort(chFilter(~isnan(chFilter)));
+% postSensoryChIdx = find(ismember(elecOrder,  chFilter), 1, 'last');
+% 
+% plot([antSensoryChIdx + 0.5, postSensoryChIdx + 0.5], [antSensoryChIdx + 0.5, antSensoryChIdx + 0.5], 'k', 'LineWidth', 1) % top
+% plot([antSensoryChIdx + 0.5, antSensoryChIdx + 0.5], [postSensoryChIdx + 0.5, antSensoryChIdx + 0.5], 'k', 'LineWidth', 1) % left
+% plot([antSensoryChIdx + 0.5, postSensoryChIdx + 0.5], [postSensoryChIdx + 0.5, postSensoryChIdx + 0.5], 'k', 'LineWidth', 1) % bottom
+% plot([postSensoryChIdx + 0.5, postSensoryChIdx + 0.5], [postSensoryChIdx + 0.5, antSensoryChIdx + 0.5], 'k', 'LineWidth', 1) % right
+% 
+% % Anterior motor array line
+% chFilter = cat(1, chanMap.ArrayLocations{1});
+% chFilter = sort(chFilter(~isnan(chFilter)));
+% antMotorChIdx = find(ismember(elecOrder,  chFilter), 1, 'last');
+% 
+% plot([postSensoryChIdx + 0.5, antMotorChIdx + 0.5], [postSensoryChIdx + 0.5, postSensoryChIdx + 0.5], 'k', 'LineWidth', 1) % top
+% plot([postSensoryChIdx + 0.5, postSensoryChIdx + 0.5], [antMotorChIdx + 0.5, postSensoryChIdx + 0.5], 'k', 'LineWidth', 1) % left
+% plot([postSensoryChIdx + 0.5, antMotorChIdx + 0.5], [antMotorChIdx + 0.5, antMotorChIdx + 0.5], 'k', 'LineWidth', 1) % bottom
+% plot([antMotorChIdx + 0.5, antMotorChIdx + 0.5], [antMotorChIdx + 0.5, postSensoryChIdx + 0.5], 'k', 'LineWidth', 1) % right
+% 
+% % Posterior motor array line
+% chFilter = cat(1, chanMap.ArrayLocations{3});
+% chFilter = sort(chFilter(~isnan(chFilter)));
+% postMotorChIdx = find(ismember(elecOrder,  chFilter), 1, 'last');
+% 
+% plot([antMotorChIdx + 0.5, postMotorChIdx + 0.5], [antMotorChIdx + 0.5, antMotorChIdx + 0.5], 'k', 'LineWidth', 1) % top
+% plot([antMotorChIdx + 0.5, antMotorChIdx + 0.5], [postMotorChIdx + 0.5, antMotorChIdx + 0.5], 'k', 'LineWidth', 1) % left
+% plot([antMotorChIdx + 0.5, postMotorChIdx + 0.5], [postMotorChIdx + 0.5, postMotorChIdx + 0.5], 'k', 'LineWidth', 1) % bottom
+% plot([postMotorChIdx + 0.5, postMotorChIdx + 0.5], [postMotorChIdx + 0.5, antMotorChIdx + 0.5], 'k', 'LineWidth', 1) % right
+
+set(gca, 'YTick', [7, 20, 32, 65], 'YTickLabel', {'Ant. SC', 'Post. SC', 'Ant. MC', 'Post. MC'})
 title('Max Correlation')
 
-nexttile
-h = imagesc(maxLag);
-set(h, 'AlphaData', ~isnan(maxLag))
-axis square
-cbar = colorbar;
-ylabel(cbar, 'Lag Time')
-set(gca, 'YTick', [1, 5, 30, 58], 'YTickLabel', {'Ant. SC', 'Post. SC', 'Ant. MC', 'Post. MC'})
-title('Lag Time')
+% nexttile
+% h = imagesc(maxLag);
+% set(h, 'AlphaData', ~isnan(maxLag))
+% axis square
+% cbar = colorbar;
+% ylabel(cbar, 'Lag Time')
+% set(gca, 'YTick', [1, 5, 30, 58], 'YTickLabel', {'Ant. SC', 'Post. SC', 'Ant. MC', 'Post. MC'})
+% title('Lag Time')
 
 
 %% Saving data
