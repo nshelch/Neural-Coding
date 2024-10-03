@@ -261,13 +261,16 @@ for e = coi
     axes('Position', [.15 .1 .8 .6]); hold on
     r = Rasterfy(cellfun(@transpose, L4_str.data.rasters{e}, 'UniformOutput', false), .4, true);
     plot(r(:,1), r(:,2), 'Color', nhpColor)
-    set(gca, 'XLim', [-1 2], 'YLim', [0 length(spikeCounts{f,a,e})], 'YTick', [], 'YColor', 'none')
+    set(gca, 'XLim', [-1 2], 'YLim', [0 length(r)], 'YTick', [], 'YColor', 'none')
     xlabel('Time (seconds)')
     
     print(gcf, fullfile('.\Figures\SFN', sprintf('MacaqueIndent_%d', e)), '-dpng', '-r900')
 
 end
 
+figure('Units', 'Inches', 'Position', [10 2 4 6])
+r = Rasterfy(indentation_data.aligned_spikes(1, :), .4, true);
+plot(r(:,1), r(:,2), 'Color', nhpColor)
 
 
 %% Adaptibility Index Figure
@@ -297,3 +300,9 @@ xlabel('Adaptation Index')
 ylabel('Proportion', 'Position', [-.2 .325 -1])
    
 print(gcf, fullfile('.\Figures\SFN', 'adaptationIndex'), '-dpng', '-r900')
+
+
+
+histogram(indentation_data.adaptability_index, 'BinEdges', linspace(0, 1, 7), 'Normalization', 'probability', ...
+    'FaceColor', nhpColor)
+

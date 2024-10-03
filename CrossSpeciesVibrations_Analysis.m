@@ -55,14 +55,12 @@ for i = 1:height(all_data)
     end
 
     % Permutation
-
-
     all_data{i, "SpikeRates"} = {usp};
 end
 
 
 %% Rate intensity functions
-for i = 1:64 %height(all_data)
+for i = 1:height(all_data)
     [usp, ~, u_idx] = unique(all_data{i, "StimParams"}{1}, "rows");
     for p = 1:height(usp)
         p_idx = u_idx == p;
@@ -70,6 +68,8 @@ for i = 1:64 %height(all_data)
         stim_spikes = cellfun(@(c) sum(c >= 0 & c <= 1), temp_spikes); % Maybe extend it to 1.2 for human data
         usp{p, "SpikeCount"} = {stim_spikes};
         usp{p, "AvgFR"} = nanmean(stim_spikes);
+    
+    
     end
     all_data{i, "RateIntensity"} = {usp};
 
@@ -81,33 +81,109 @@ for i = 1:64 %height(all_data)
         tmp_fr(f) = prctile(usp{f_idx, "AvgFR"}, 75);
     end
 
-    plot(freq, tmp_fr, 'k')
-    % Tuning curves for rate modulation stuff
-
-    p = polyfit(freq, tmp_fr, 6); % Lee 24 paper used 6 for their polyfit
+     all_data{i, "freqResponse"} = {tmp_fr}; 
+%     plot(freq, tmp_fr, 'k')
+%     % Tuning curves for rate modulation stuff
 % 
-    y1 = polyval(p, linspace(min(freq), max(freq), 100));
-    hold on
-    plot(linspace(min(freq), max(freq), 100), y1)
-    hold off
-    %
-    %     usf = table(freq, 'VariableNames', {'Freq'});
-
-        print(gcf, fullfile('.\Figures\Vibrations\TuningCurves', sprintf('%s_%s_Ch%d', all_data.Species{i}, all_data.Location{i}, all_data.CellID(i))), '-dpng', '-r900')
+%     p = polyfit(freq, tmp_fr, 6); % Lee 24 paper used 6 for their polyfit
+% % 
+%     y1 = polyval(p, linspace(min(freq), max(freq), 100));
+%     hold on
+%     plot(linspace(min(freq), max(freq), 100), y1)
+%     hold off
+%     %
+%     %     usf = table(freq, 'VariableNames', {'Freq'});
+% 
+%         print(gcf, fullfile('.\Figures\Vibrations\TuningCurves', sprintf('%s_%s_Ch%d', all_data.Species{i}, all_data.Location{i}, all_data.CellID(i))), '-dpng', '-r900')
 
 
 end
 
-%% Figure plotting
+%% Tuning Curves
+
+lightGrey = [0.8, 0.8, 0.8];  % Light grey for data points
+darkLilac = [0.6, 0.33, 0.73];  % Dark lilac for the fit line
+
+for i = 137:height(all_data)
+    x = unique(all_data.RateIntensity{i}.Freq);
+    y = all_data.freqResponse{i};  % Replace with your actual response data
+
+    gammaModel = fittype('A * x^(k-1) * exp(-x/theta) + C', ...
+        'independent', 'x', ...
+        'coefficients', {'A', 'k', 'theta', 'C'});
+
+    %initial guesses for A, k, and theta
+    startPoints = [1, 2, 100, 0];
+
+    %set lower and upper bounds for the parameters to avoid problematic values
+    lowerBounds = [0, 0.1, 1, -Inf];  % Lower bounds for A, k, theta, C
+    upperBounds = [Inf, Inf, Inf, Inf];  % Upper bounds for A, k, theta, C
+
+    %fit
+    gammaFit = fit(x, y, gammaModel, 'StartPoint', startPoints, 'Lower', lowerBounds, 'Upper', upperBounds);
+
+    % close all
+%     figure;
+clf;
+    hold on;
+
+    %plot the data points in light grey
+    plot(x, y, 'o', 'MarkerSize', 6, 'MarkerEdgeColor', lightGrey, 'MarkerFaceColor', lightGrey);
+
+    %evaluate the gamma fit over the range of x values
+    x_fit = linspace(min(x), max(x), 1000);
+
+    %evaluate the gamma fit at these x values
+    y_fit = feval(gammaFit, x_fit);
+
+    %calculate half height
+    halfHeight = (max(y_fit) + min(y_fit)) / 2;
+
+    %subtract the half height to make it easier to find corresponding x-values
+    %since half-height is now the x-axis, return the sign of the values, and then find
+    %where the difference is not zero
+    halfHeightIdx = find(diff(sign(y_fit-halfHeight)));
+
+    %if the half height only has one value then add zero as the first value
+    if length(halfHeightIdx) < 2
+        halfHeightIdx = [1 halfHeightIdx];
+    end
+
+    all_data{i, "whm"} = x_fit(halfHeightIdx(2)) - x_fit(halfHeightIdx(1));
+
+    %plot the fitted gamma line in dark lilac
+    plot(x_fit, y_fit, 'Color', darkLilac, 'LineWidth', 2);
+
+    plot(x_fit(halfHeightIdx), repmat(mean(y_fit(halfHeightIdx)),1,2),'Color','r','LineStyle','--')
+
+    %set x-ticks to only the frequency values in x
+    xticks(x);
+    xtickLabels = string(x);
+    xtickLabels(xtickLabels == "10") = "";
+    set(gca, 'XTickLabel', xtickLabels);
+
+    title(sprintf('%s %s Ch%d', all_data.Species{i}, all_data.Location{i}, all_data.CellID(i)), 'FontSize', 16, 'FontWeight', 'Bold');
+    xlabel('Frequency (Hz)', 'FontSize', 14, 'FontWeight', 'Bold');
+    ylabel('Response', 'FontSize', 14, 'FontWeight', 'Bold');
+
+    legend({'Data', 'Gamma Fit'}, 'FontSize', 12, 'Location', 'Best');
+    set(gca, 'FontSize', 12, 'LineWidth', 1.5);
+
+%     hold off;
+
+    print(gcf, fullfile('.\Figures\Vibrations\TuningCurves', sprintf('%s_%s_Ch%d', all_data.Species{i}, all_data.Location{i}, all_data.CellID(i))), '-dpng', '-r900')
+
+
+end
+%% Figure plotting - Rate Intensity
 figure('Units', 'Inches', 'Position', [10 2 4 8])
 
 fcol = cool();
 freq_idx = linspace(log(10), log(500), 256);
 
-for i = 65:height(all_data)
+for i = 1:height(all_data)
 
     freq = unique(all_data{i, 'RateIntensity'}{1}{:, "Freq"});
-    amp = unique(all_data{i, 'RateIntensity'}{1}{:, "Amp"});
     freqColor = cmap_gradient([rgb(3, 155, 229); rgb(216, 27, 96)], length(freq));
 
     % Raster
@@ -136,11 +212,11 @@ for i = 65:height(all_data)
         freqIdx = all_data{i, 'RateIntensity'}{1}{:, "Freq"} == freq(f);
         temp_data = vertcat(all_data{i, 'RateIntensity'}{1}{freqIdx, "SpikeCount"}{:})';
 
-        AlphaLine([5, 50, 100, 200, 400], temp_data, freqColor(f, :), 'ErrorType', 'SEM')
+        AlphaLine(all_data{i, 'RateIntensity'}{1}{freqIdx, "Amp"}, temp_data, freqColor(f, :), 'ErrorType', 'SEM')
         hold on
-
     end
-    set(gca, 'XScale', 'log', 'XLim', [0 400])
+
+    set(gca, 'XScale', 'log', 'XLim', [0 1000])
     ylabel('Firing Rate [Hz]')
     xlabel('Amplitude')
 
@@ -160,8 +236,6 @@ for i = 1:height(all_data)
     end
     all_data{i, "PhaseLocking"} = {usp};
 end
-
-%% Plot
 
 %% Macaque phase lock across areas
 nhpColor = rgb(251, 140, 0);
@@ -319,8 +393,47 @@ for i = 1:length(idx)
     plot(x,y, 'Color', [.6 .6 .6])
 end
 
-%% Rate modulation
+%% Ternary plots
+freqGroups = [0, 40, 100, Inf];
+tmp_freq = zeros(height(all_data), length(freqGroups) - 1) ;
+freqResp = zeros(height(all_data), 2);
 
+for i = 1:height(all_data)
+    tmp_data = all_data{i, "PhaseLocking"}{1};
+    for fg = 1:length(freqGroups) - 1
+        fg_idx = tmp_data{:, "Freq"} >= freqGroups(fg) & tmp_data{:, "Freq"} < freqGroups(fg + 1);
+        tmp_freq(i, fg) = prctile(tmp_data{fg_idx, "PhaseLockRatio"}, 75);
+    end
+    
+    freqResp(i, 1) = tmp_freq(i, 1) ./ sum(tmp_freq(i, :));     % First columm is response to low frequency vibrations (SA)
+    freqResp(i, 2) = (tmp_freq(i, 3) - tmp_freq(i, 2)) ./ sum(tmp_freq(i, :));     % Second columm is for the mid-high gradient (RA, PC)
+
+end
+
+% Plots
+
+figure;
+scatter(freqResp(147:222,2), freqResp(147:222, 1), 'MarkerEdgeColor', 'k', 'MarkerFaceColor', 'k', 'MarkerFaceAlpha', 0.15)
+hold on
+plot([-1 0 1 -1],[0 1 0 0], 'LineStyle', '--', 'Color', [0.6 0.6 0.6])
+plot([-0.5,0],[0.5 0.325], 'LineStyle', '--', 'Color', [0.6 0.6 0.6])
+plot([0,0],[0 0.325], 'LineStyle', '--', 'Color', [0.6 0.6 0.6])
+plot([0,0.5],[0.325 0.5], 'LineStyle', '--', 'Color', [0.6 0.6 0.6])
+
+set(gca, 'PlotBoxAspectRatio', [1,1,1]);
+xlim([-1 1]); ylim([0 1.1]);
+
+set(gca, 'YColor', 'none', 'XColor', 'none')
+text(-1,0, 'med', 'VerticalAlignment', 'top', 'HorizontalAlignment', 'right')
+text(1,0, 'high', 'VerticalAlignment', 'top', 'HorizontalAlignment', 'left')
+text(0,1, 'low', 'VerticalAlignment', 'bottom', 'HorizontalAlignment', 'center')
+
+
+
+
+
+
+%     print(gcf, fullfile('.\Figures\Vibrations\TuningCurves', sprintf('%s_%s_Ch%d', all_data.Species{i}, all_data.Location{i}, all_data.CellID(i))), '-dpng', '-r900')
 
 
 
