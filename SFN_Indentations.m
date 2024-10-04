@@ -79,6 +79,22 @@ for e = 1:numElectrodes
 
 end % electrode loop
 
+%% Plot vibration and indentation stimuli
+
+% Vibrations
+amplitude = 0.1;
+period = 1.0;
+t = linspace(0, 10, 5000);
+y = amplitude * sin(2 * pi * t / period);
+plot(t, y, 'k-', 'LineWidth', 2);
+axis off
+set(gcf, 'color', 'none'); set(gca, 'color', 'none');
+    set(gcf,'InvertHardcopy','off');
+
+print(gcf, fullfile('.\Figures\SFN', 'Correlation'), '-dpng', '-r900')
+exportgraphics(gca, fullfile('.\Figures\SFN', 'VibrationStimuli2.png'),'BackgroundColor','none')
+
+
 %% Example Rasters - Human
 
 % Binning for later plots
@@ -88,31 +104,36 @@ binCenter = binEdges(1:end-1) + (dt / 2);
 
 analogTime = linspace(-1, 2, 30e3);
 
-humanColor = rgb(67, 160, 71);
+humanColor = rgb(57, 73, 171);
 
 %% Plot one condition with stimulus
 % close all; clc;
 coi = [71, 207, 214, 216, 218]; 
 
-figure('Units', 'Inches', 'Position', [10 2 4 6])
-for e = coi
+SetFont('Arial', 14)
+% figure('Units', 'Inches', 'Position', [10 2 3 3])
+
+for e = 154
     clf;
     f = 5;
-    a = 5;
+    a = 4;
 
-    axes('Position', [.15 .75 .8 .2]); hold on
+    axes('Position', [.2 .55 .75 .4]); hold on
     t = FoldedPSTH(spikeCounts{f, a, e}, binEdges, 5, 5);
-    AlphaLine(binCenter, t, humanColor)
+    AlphaLine(binCenter, t, motorColor)
     ylabel('Firing Rate (Hz)')
     set(gca, 'XTick', [])
+    yLims = get(gca, 'YLim');
+%     text(-.9, yLims(2), ColorText('Area 1', humanColor), 'HorizontalAlignment', 'left', 'VerticalAlignment', 'top')
+    text(-.9, yLims(2), ColorText('Motor', motorColor), 'HorizontalAlignment', 'left', 'VerticalAlignment', 'top')
 
-    axes('Position', [.15 .1 .8 .6]); hold on
+    axes('Position', [.2 .1 .75 .4]); hold on
     r = Rasterfy(spikeCounts{f, a, e}, .4, true);
-    plot(r(:,1), r(:,2), 'Color', humanColor)
+    plot(r(:,1), r(:,2), 'Color', motorColor, 'LineWidth', 1)
     set(gca, 'YLim', [0 length(spikeCounts{f,a,e})], 'YTick', [], 'YColor', 'none')
+    
     xlabel('Time (seconds)')
-    print(gcf, fullfile('.\Figures\SFN', sprintf('HumanIndent_SE%d', e)), '-dpng', '-r900')
-
+    print(gcf, fullfile('.\Figures\SFN', sprintf('HumanIndent_Motor%d', e)), '-dpng', '-r900')
 end
 
 
@@ -157,26 +178,31 @@ end
 %% Plot averaged responses
 
  % inhibitory response: 214, 216, 218
-humanColor = rgb(67, 160, 71);
+% humanColor = rgb(67, 160, 71);
 
-close all;
+motorColor = rgb(0, 137, 123);
+% close all;
 figure('Units', 'Inches', 'Position', [8 4 3 2])
-for e = 212
+for e = 161
     clf;    
-    axes('Position', [.175 .25 .8 .725]); hold on
-    for f = 5 
-            t = FoldedPSTH(vertcat(spikeCounts{f, 1:5, e}), binEdges, 5, 5);
-            AlphaLine(binCenter, t, humanColor)
+    axes('Position', [.175 .25 .8 .715]); hold on
+    for f = 3 
+            t = FoldedPSTH(vertcat(spikeCounts{f, :, e}), binEdges, 5, 5);
+            AlphaLine(binCenter, t, motorColor)
     end
     ylabel('Firing Rate (Hz)')
     set(gca, 'XTick', -1:1:2)
     xlabel('Time (s)')
     
+    yLims = get(gca, 'YLim');
+    text(-.9, yLims(2), ColorText('Motor', motorColor), 'HorizontalAlignment', 'left', 'VerticalAlignment', 'top')
+
+
 %     % Stimulus lines
 %     plot([0 0], [25 40], '--', 'Color', [200, 200, 200] ./ 255)
 %     plot([1 1], [25 40], '--', 'Color', [200, 200, 200] ./ 255)
 
-    print(gcf, fullfile('.\Figures\SFN', sprintf('HumanIndent_SE%d', e)), '-dpng', '-r900')
+    print(gcf, fullfile('.\Figures\SFN', sprintf('HumanIndent_ME%d', e)), '-dpng', '-r900')
 end
 
 %%
@@ -213,7 +239,7 @@ motorColor = rgb(0, 137, 123);
 
 close all;
 figure('Units', 'Inches', 'Position', [8 4 5 4])
-for e = 154
+for e = 161
     clf;    
     axes('Position', [.15 .15 .8 .8]); hold on
     for f = 5 %1:length(freq)
@@ -236,73 +262,156 @@ end
 
 
 
-%% Load macaque data
+%% Load Cortical macaque data
 
 load('S:\UserFolders\CharlesGreenspon\SpeciesVibrations\RawMacaqueCorticalIndentationData.mat')
 
 a1Idx = find(strcmp(L4_str.specs.anat_loc, 'a1'));
-macaqueAI = L4_str.data.transienceIndex(a1Idx);
+macaqueAI_area1 = L4_str.data.transienceIndex(a1Idx);
+
+a3bIdx = find(strcmp(L4_str.specs.anat_loc, '3b'));
+macaqueAI_area3b = L4_str.data.transienceIndex(a3bIdx);
 
 nhpColor = rgb(251, 140, 0);
 
 %%
 % Example Rasters - Macaque
-figure('Units', 'Inches', 'Position', [10 2 4 6])
+SetFont('Arial', 14)
 
-coi = [14, 72, 117];
-for e = coi
+dt = 0.02;
+binEdges = 0:dt:1;
+binCenter = binEdges(1:end-1) + (dt / 2);
+
+
+% figure('Units', 'Inches', 'Position', [10 2 3 3])
+
+% coi = [14, 72, 117];
+for e = a1Idx'
     clf;
-    axes('Position', [.15 .75 .8 .2]); hold on
+
+    axes('Position', [.2 .55 .75 .4]); hold on
     t = FoldedPSTH(cellfun(@transpose, L4_str.data.rasters{e}, 'UniformOutput', false), binEdges, 5, 5);
     AlphaLine(binCenter, t, nhpColor)
     ylabel('Firing Rate (Hz)')
-    set(gca, 'XLim', [-1 2], 'XTick', [])
+    set(gca, 'XLim', [0 1], 'XTick', [])
+    yLims = get(gca, 'YLim');
 
-    axes('Position', [.15 .1 .8 .6]); hold on
+%     if strcmpi(L4_str.specs.anat_loc{e}, '3B')
+%         text(1, yLims(2), ColorText('Area 3b', nhpColor), 'HorizontalAlignment', 'right', 'VerticalAlignment', 'top')
+%     else
+        text(1, yLims(2), ColorText('Area 1', nhpColor), 'HorizontalAlignment', 'right', 'VerticalAlignment', 'top')
+%     end
+
+    axes('Position', [.2 .1 .75 .4]); hold on
     r = Rasterfy(cellfun(@transpose, L4_str.data.rasters{e}, 'UniformOutput', false), .4, true);
     plot(r(:,1), r(:,2), 'Color', nhpColor)
-    set(gca, 'XLim', [-1 2], 'YLim', [0 length(r)], 'YTick', [], 'YColor', 'none')
-    xlabel('Time (seconds)')
+    set(gca, 'XLim', [0 1], 'YTick', [], 'YColor', 'none')
+
+    %     set(gca, 'XLim', [-1 2], 'YLim', [0 length(r(~isnan(r(:, 1))))], 'YTick', [], 'YColor', 'none')
+%     xlabel('Time (seconds)')
     
-    print(gcf, fullfile('.\Figures\SFN', sprintf('MacaqueIndent_%d', e)), '-dpng', '-r900')
+    print(gcf, fullfile('.\Figures\Macaque', sprintf('Macaque_%s_%d', L4_str.specs.anat_loc{e}, e)), '-dpng', '-r900')
 
 end
 
-figure('Units', 'Inches', 'Position', [10 2 4 6])
-r = Rasterfy(indentation_data.aligned_spikes(1, :), .4, true);
-plot(r(:,1), r(:,2), 'Color', nhpColor)
+%% Only psth
+
+% figure('Units', 'Inches', 'Position', [8 4 3 2])
+
+dt = 0.02;
+binEdges = 0:dt:1;
+binCenter = binEdges(1:end-1) + (dt / 2);
+
+for e = 107
+    clf;    
+    axes('Position', [.175 .25 .8 .715]); hold on
+       t = FoldedPSTH(cellfun(@transpose, L4_str.data.rasters{e}, 'UniformOutput', false), binEdges, 5, 5);
+    AlphaLine(binCenter, t, nhpColor)
+    ylabel('Firing Rate (Hz)')
+    set(gca, 'XLim', [0 1])
+    yLims = get(gca, 'YLim');
+
+    if strcmpi(L4_str.specs.anat_loc{e}, '3B')
+        text(1, yLims(2), ColorText('Area 3b', nhpColor), 'HorizontalAlignment', 'right', 'VerticalAlignment', 'top')
+    else
+        text(1, yLims(2), ColorText('Area 1', nhpColor), 'HorizontalAlignment', 'right', 'VerticalAlignment', 'top')
+    end
+
+    
+    yLims = get(gca, 'YLim');
+    text(-.9, yLims(2), ColorText('Motor', motorColor), 'HorizontalAlignment', 'left', 'VerticalAlignment', 'top')
+
+    print(gcf, fullfile('.\Figures\SFN', sprintf('Macaque_%s_%d', L4_str.specs.anat_loc{e}, e)), '-dpng', '-r900')
+end
+
+
+
+
+
+% figure('Units', 'Inches', 'Position', [10 2 4 6])
+% r = Rasterfy(indentation_data.aligned_spikes(1, :), .4, true);
+% plot(r(:,1), r(:,2), 'Color', nhpColor)
+
+%% Load Cuneate macaque data
+
+
+
+
 
 
 %% Adaptibility Index Figure
 
 nhpColor = rgb(251, 140, 0);
-humanColor = rgb(67, 160, 71);
+humanColor = rgb(57, 73, 171);
+motorColor = rgb(0, 137, 123);
 
-sensoryChIdx = [65:96, 193:224];
+sensoryChIdx = [65:96, 193:224]; sigSensory = sensoryChIdx(ismember(sensoryChIdx, sigElecIdx));
+motorChIdx = [1:64, 97:192, 225:256]; sigMotor = motorChIdx(ismember(motorChIdx, sigElecIdx));
 
-figure('Units', 'Inches', 'Position', [10 2 4 5])
+% figure('Units', 'Inches', 'Position', [10 2 4 8])
+figure('Units', 'Inches', 'Position', [8 4 3 2.5])
 
-axes('Position', [.15 .55 .8 .375])
-histogram(adaptationIndex(sensoryChIdx), 'BinEdges', linspace(0, 1, 7), 'Normalization', 'probability', ...
-    'FaceColor', humanColor)
-box off
-set(gca, 'YTick', 0:.2:.6, 'XTick', [])
-text(0, .6, ColorText({'Human - Area 1'}, humanColor), 'HorizontalAlignment', 'left', 'VerticalAlignment', 'top')
-
-
-axes('Position', [.15 .1 .8 .375])
-histogram(macaqueAI, 'BinEdges', linspace(0, 1, 7), 'Normalization', 'probability', ...
+clf;
+% axes('Position', [.15 .8 .8 .2])
+histogram(macaqueAI_area3b, 'BinEdges', linspace(0, 1, 7), 'Normalization', 'probability', ...
     'FaceColor', nhpColor)
 box off
-set(gca, 'YTick', 0:.1:.3, 'XTick', [0 1])
-text(0, .3, ColorText({'NHP - Area 1'}, nhpColor), 'HorizontalAlignment', 'left', 'VerticalAlignment', 'top')
+set(gca, 'YLim', [0 .3], 'YTick', 0:.1:.6, 'XTick', [])
+text(0, .3, ColorText({'Macaque - Area 3b'}, nhpColor), 'HorizontalAlignment', 'left', 'VerticalAlignment', 'top')
+xlabel('Adaptation Index')
+% ylabel('Proportion')
+print(gcf, fullfile('.\Figures\SFN', 'Macaque_3B_adaptationIndex'), '-dpng', '-r900')
+
+
+axes('Position', [.15 .55 .8 .2])
+histogram(macaqueAI_area1, 'BinEdges', linspace(0, 1, 7), 'Normalization', 'probability', ...
+    'FaceColor', nhpColor)
+box off
+set(gca, 'YLim', [0 .6], 'YTick', 0:.2:.6, 'XTick', [])
+text(0, .3, ColorText({'Macaque - Area 1'}, nhpColor), 'HorizontalAlignment', 'left', 'VerticalAlignment', 'top')
+print(gcf, fullfile('.\Figures\SFN', 'Macaque_A1_adaptationIndex'), '-dpng', '-r900')
+
+
+axes('Position', [.15 .3 .8 .2])
+histogram(adaptationIndex(sigSensory), 'BinEdges', linspace(0, 1, 7), 'Normalization', 'probability', ...
+    'FaceColor', humanColor)
+box off
+set(gca, 'YLim', [0 .6], 'YTick', 0:.2:.6, 'XTick', [])
+text(0, .6, ColorText({'Human - Area 1'}, humanColor), 'HorizontalAlignment', 'left', 'VerticalAlignment', 'top')
+print(gcf, fullfile('.\Figures\SFN', 'Human_A1_adaptationIndex'), '-dpng', '-r900')
+
+
+
+axes('Position', [.15 .05 .8 .2])
+histogram(adaptationIndex(sigMotor), 'BinEdges', linspace(0, 1, 7), 'Normalization', 'probability', ...
+    'FaceColor', motorColor)
+box off
+set(gca, 'YLim', [0 .6], 'YTick', 0:.2:.6, 'XTick', [])
+text(0, .3, ColorText({'Human - Motor'}, motorColor), 'HorizontalAlignment', 'left', 'VerticalAlignment', 'top')
+print(gcf, fullfile('.\Figures\SFN', 'Human_MC_adaptationIndex'), '-dpng', '-r900')
+
+
 xlabel('Adaptation Index')
 ylabel('Proportion', 'Position', [-.2 .325 -1])
    
 print(gcf, fullfile('.\Figures\SFN', 'adaptationIndex'), '-dpng', '-r900')
-
-
-
-histogram(indentation_data.adaptability_index, 'BinEdges', linspace(0, 1, 7), 'Normalization', 'probability', ...
-    'FaceColor', nhpColor)
-

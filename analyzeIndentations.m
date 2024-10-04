@@ -201,13 +201,22 @@ for n1 = 1:numSigElecs
 end % channel 1 loop
 
 %%
+
+cmap = cmap_gradient([rgb(25, 118, 210); rgb(250, 250, 250); rgb(194, 24, 91)]);
+
+maxCorr2 = maxCorr;
+maxCorr2(isnan(maxCorr)) = 1;
+
 figure;
-nexttile
-h = imagesc(maxCorr);
-set(h, 'AlphaData', ~isnan(maxCorr))
+h = imagesc(maxCorr2);
+set(h, 'AlphaData', ~isnan(maxCorr2))
 axis square
 cbar = colorbar;
 ylabel(cbar, 'Correlation')
+cbar.Ticks = -1:2:1;
+cbar.TickLabels = {'', '', ''};
+cbar.Limits = [-1 1];
+
 
 hold on
 
@@ -283,6 +292,8 @@ plot([postMotorChIdx + 0.5, postMotorChIdx + 0.5], [0.5 length(elecOrder) + 0.5]
 % plot([postMotorChIdx + 0.5, postMotorChIdx + 0.5], [postMotorChIdx + 0.5, antMotorChIdx + 0.5], 'k', 'LineWidth', 1) % right
 
 set(gca, 'YTick', [7, 20, 32, 65], 'YTickLabel', {'Ant. SC', 'Post. SC', 'Ant. MC', 'Post. MC'})
+set(gca, 'XTick', [7, 20, 32, 65], 'XTickLabel', {'Ant. SC', 'Post. SC', 'Ant. MC', 'Post. MC'})
+set(gca, 'XTick', [], 'XTickLabel', {''})
 title('Max Correlation')
 
 % nexttile

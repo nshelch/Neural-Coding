@@ -16,7 +16,7 @@ all_freq = [unique(all_data{coi(1), 'RateIntensity'}{1}{:, "Freq"}); unique(all_
 uniq_freq = unique(all_freq);
 freqColor = cmap_gradient([rgb(3, 155, 229); rgb(216, 27, 96)], length(uniq_freq));
 
-for i = 59
+for i = 195
 
     % Raster
     [usp, ~, u_idx] = unique(all_data{i, "StimParams"}{1}, "rows");
@@ -258,9 +258,9 @@ for i = 1:length(idx)
     end
 end
 
-axes('Position', [.175 .75 .775 .2]); hold on
+% axes('Position', [.175 .75 .775 .2]); hold on
 scatter(freq, y, 20, nhpColor, 'filled')
-text(800, 1, ColorText({'Cuneate'}, nhpColor), 'HorizontalAlignment', 'right', 'VerticalAlignment', 'top')
+text(300, 1, ColorText({'Cuneate'}, nhpColor), 'HorizontalAlignment', 'right', 'VerticalAlignment', 'top')
 
 xlim([0 800])
 ylim([0 1])
@@ -320,8 +320,10 @@ axes('Position', [.175 .075 .775 .2]); hold on
 scatter(freq, y, 20, humanColor, 'filled')
 ylim([0 1])
 xlim([0 800])
-text(800, 1, ColorText({'Area 1'}, humanColor), 'HorizontalAlignment', 'right', 'VerticalAlignment', 'top')
+text(300, 1, ColorText({'Area 1'}, humanColor), 'HorizontalAlignment', 'right', 'VerticalAlignment', 'top')
 xlabel('Frequency [Hz]')
 ylabel('Phase Locking Probability')
 
-print(gcf, fullfile('.\Figures\SFN', 'PhaseLockWithinAreas'), '-dpng', '-r900')
+print(gcf, fullfile('.\Figures\SFN', 'PhaseLockCuneate'), '-dpng', '-r900')
+
+figure('Units', 'Inches', 'Position', [8 4 3 2.5])
